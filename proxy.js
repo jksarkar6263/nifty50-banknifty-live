@@ -92,9 +92,30 @@ function buildRows(rows, indexName) {
     `;
   };
 
+  // Helper for note row
+  const renderNoteRow = (text) => {
+    return `
+      <tr>
+        <td colspan="9" style="text-align:center; background:#fff9c4; color:#333; font-weight:bold;">
+          ${text}
+        </td>
+      </tr>
+    `;
+  };
+
+  // Build rows with note after every 10th
+  let otherRowsHTML = '';
+  otherRows.forEach((r, idx) => {
+    otherRowsHTML += renderBodyRow(r);
+
+    if ((idx + 1) % 10 === 0) {
+      otherRowsHTML += renderNoteRow("© 2025 jayfromstockmarketsinindia.blogspot.com | Powered by Jay");
+    }
+  });
+
   return {
     indexRowHTML: indexRow ? renderIndexHeaderRow(indexRow) : '',
-    otherRowsHTML: otherRows.map(renderBodyRow).join('')
+    otherRowsHTML
   };
 }
 
@@ -220,7 +241,7 @@ app.get('/api/quotes', async (req, res) => {
     /* Sticky header titles row */
     thead tr.header-row th {
       position: sticky;
-      top: 42px; /* below tabs */
+      top: 40px; /* below tabs */
       z-index: 7;
       background-color: #f4f4f4;
       cursor: pointer;
@@ -229,7 +250,7 @@ app.get('/api/quotes', async (req, res) => {
     /* Sticky index row just below header */
     thead tr.index-row th {
       position: sticky;
-      top: 74px; /* adjust if header row height changes */
+      top: 70px; /* adjust if header row height changes */
       z-index: 6;
       background-color: #fff9c4;
       font-weight: bold;
@@ -315,5 +336,5 @@ app.get('/api/quotes', async (req, res) => {
 });
 
 /* ========= Server ========= */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render provides PORT; fallback to 10000
 app.listen(PORT, () => console.log(`Proxy running on http://localhost:${PORT}`));
