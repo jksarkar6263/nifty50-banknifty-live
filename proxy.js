@@ -69,7 +69,7 @@ function buildRows(rows,indexName,interval){
         <th scope="col">${fmtNum(r.high)}</th>
         <th scope="col">${fmtNum(r.low)}</th>
         <th scope="col">${fmtNum(r.prevClose)}</th>
-        <th scope="col">${vol}</th>
+        <th scope="col">${fmtNum(r.vol)}</th>
       </tr>
     `;
   };
@@ -125,7 +125,7 @@ app.get('/api/quotes', async (req,res)=>{
     .tab button:hover{background:#e9e9e9;} .tab button.active{background:#ddd;}
     .tabcontent{display:none;padding:10px;}
     .table-container{width:100%;overflow-x:auto;}
-    table{border-collapse:collapse;width:100%;font-size:10px;background:#fff;min-width:700px;}
+    table{border-collapse:collapse;width:100%;font-size:11px;background:#fff;min-width:700px;}
     th,td{border:1px solid #ddd;padding:6px 8px;text-align:right;white-space:nowrap;}
     td:first-child,th:first-child{text-align:left;}
     thead tr.header-row th{position:sticky;top:calc(var(--sticky-tabs) + 0px);z-index:7;background:#f4f4f4;cursor:pointer;}
@@ -162,13 +162,10 @@ app.get('/api/quotes', async (req,res)=>{
       const noteInterval = tableId==='niftyTable' ? 10 : (tableId==='bankTable' ? 6 : 0);
       const noteText = "Copy rights reserved with <b>Jay</b> | Powered by <i>jayfromstockmarketsinindia.blogspot.com</i>";
 
-      // skip note rows
       const dataRows = Array.from(tbody.rows).filter(r=>!r.classList.contains('note-row'));
 
-      // direction
       let dir=setDefault?'asc':(sortState[tableId+key]==='asc'?'desc':'asc'); sortState[tableId+key]=dir;
 
-      // sort
       dataRows.sort((a,b)=>{
         let ax=a.cells[colIndex].innerText.trim(), bx=b.cells[colIndex].innerText.trim();
         let x=ax, y=bx;
@@ -181,7 +178,6 @@ app.get('/api/quotes', async (req,res)=>{
         return 0;
       });
 
-      // rebuild
       tbody.innerHTML='';
       dataRows.forEach((r,idx)=>{
         tbody.appendChild(r);
