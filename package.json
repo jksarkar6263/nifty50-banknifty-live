@@ -1,5 +1,5 @@
 {
-<<<<<<< HEAD
+
   "name": "stockapp",
   "version": "1.0.0",
   "main": "index.js",
@@ -15,7 +15,7 @@
     "node-fetch": "^3.3.2"
   }
 }
-=======
+
   "name": "nifty50-banknifty-live",
   "version": "1.0.0",
   "description": "Minimal server to serve a frontend and optionally proxy live data",
@@ -37,4 +37,4 @@
     "nodemon": "^2.0.22"
   }
 }
->>>>>>> 639db5a1fd611fa35147358ad347922eb570c5ef
+639db5a1fd611fa35147358ad347922eb570c5ef
