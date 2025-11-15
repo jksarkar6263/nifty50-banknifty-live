@@ -2,17 +2,9 @@ const express = require('express');
 const app = express();
 
 /* ========= Helpers ========= */
-function fmtNum(v) {
-  return (typeof v === 'number' && Number.isFinite(v)) ? v.toFixed(2) : '-';
-}
-function arrowFor(change) {
-  if (typeof change !== 'number' || !Number.isFinite(change)) return '';
-  return change > 0 ? '↑' : (change < 0 ? '↓' : '');
-}
-function clsFor(change) {
-  if (typeof change !== 'number' || !Number.isFinite(change)) return '';
-  return change > 0 ? 'positive' : (change < 0 ? 'negative' : '');
-}
+function fmtNum(v) { return (typeof v === 'number' && Number.isFinite(v)) ? v.toFixed(2) : '-'; }
+function arrowFor(change) { if (typeof change !== 'number' || !Number.isFinite(change)) return ''; return change > 0 ? '↑' : (change < 0 ? '↓' : ''); }
+function clsFor(change) { if (typeof change !== 'number' || !Number.isFinite(change)) return ''; return change > 0 ? 'positive' : (change < 0 ? 'negative' : ''); }
 
 /* ========= Data fetch (NSE India) ========= */
 async function fetchIndex(indexName) {
@@ -28,7 +20,6 @@ async function fetchIndex(indexName) {
   if (!res.ok) throw new Error(`NSE API error: ${res.status}`);
   const json = await res.json();
   if (!json || !Array.isArray(json.data)) throw new Error("NSE API error: invalid response");
-
   return json.data.map(s => ({
     symbol: s.symbol,
     cmp: s.lastPrice,
@@ -43,19 +34,15 @@ async function fetchIndex(indexName) {
 }
 
 /* ========= Builders ========= */
-function buildRows(rows, indexName) {
+function buildRows(rows, indexName, interval) {
   const indexRow = rows.find(r => r.symbol === indexName);
-  const otherRows = rows
-    .filter(r => r.symbol !== indexName)
-    .sort((a, b) => a.symbol.localeCompare(b.symbol)); // default A→Z
+  const otherRows = rows.filter(r => r.symbol !== indexName).sort((a, b) => a.symbol.localeCompare(b.symbol));
 
   const renderBodyRow = (r) => {
     const cls = clsFor(r.change);
     const arr = arrowFor(r.change);
-    const changePctDisplay = (typeof r.changePct === 'number' && Number.isFinite(r.changePct))
-      ? `${r.changePct.toFixed(2)}%` : '-';
-    const vol = (typeof r.volume === 'number' && Number.isFinite(r.volume))
-      ? r.volume.toLocaleString('en-IN') : '-';
+    const changePctDisplay = (typeof r.changePct === 'number' && Number.isFinite(r.changePct)) ? `${r.changePct.toFixed(2)}%` : '-';
+    const vol = (typeof r.volume === 'number' && Number.isFinite(r.volume)) ? r.volume.toLocaleString('en-IN') : '-';
     return `
       <tr>
         <td class="${cls}">${r.symbol} <span class="arrow">${arr}</span></td>
@@ -73,10 +60,8 @@ function buildRows(rows, indexName) {
 
   const renderIndexHeaderRow = (r) => {
     const cls = clsFor(r.change);
-    const changePctDisplay = (typeof r.changePct === 'number' && Number.isFinite(r.changePct))
-      ? `${r.changePct.toFixed(2)}%` : '-';
-    const vol = (typeof r.volume === 'number' && Number.isFinite(r.volume))
-      ? r.volume.toLocaleString('en-IN') : '-';
+    const changePctDisplay = (typeof r.changePct === 'number' && Number.isFinite(r.changePct)) ? `${r.changePct.toFixed(2)}%` : '-';
+    const vol = (typeof r.volume === 'number' && Number.isFinite(r.volume)) ? r.volume.toLocaleString('en-IN') : '-';
     return `
       <tr class="index-row">
         <th class="${cls}" scope="colgroup">${r.symbol}</th>
@@ -92,24 +77,19 @@ function buildRows(rows, indexName) {
     `;
   };
 
-  // Helper for note row
-  const renderNoteRow = (text) => {
-    return `
-      <tr>
-        <td colspan="9" style="text-align:center; background:#fff9c4; color:#333; font-weight:bold;">
-          ${text}
-        </td>
-      </tr>
-    `;
-  };
+  const renderNoteRow = () => `
+    <tr>
+      <td colspan="9" class="note-row">
+        Copy rights reserved with <b>Jay</b> | Powered by <i>jayfromstockmarketsinindia.blogspot.com</i>
+      </td>
+    </tr>
+  `;
 
-  // Build rows with note after every 10th
   let otherRowsHTML = '';
   otherRows.forEach((r, idx) => {
     otherRowsHTML += renderBodyRow(r);
-
-    if ((idx + 1) % 10 === 0) {
-      otherRowsHTML += renderNoteRow("© 2025 jayfromstockmarketsinindia.blogspot.com | Powered by Jay");
+    if ((idx + 1) % interval === 0) {
+      otherRowsHTML += renderNoteRow();
     }
   });
 
@@ -136,11 +116,10 @@ app.get('/api/quotes', async (req, res) => {
     let refreshRate = 300000; // default 5 min
     const isMarketDay = day >= 1 && day <= 5;
     const isMarketHour = (hour > 9 || (hour === 9 && minute >= 15)) && (hour < 15 || (hour === 15 && minute <= 30));
-    if (isMarketDay && isMarketHour) refreshRate = 10000; // 10s
-    else if (!isMarketDay) refreshRate = 3600000; // 1h
+    if (isMarketDay && isMarketHour) refreshRate = 10000; else if (!isMarketDay) refreshRate = 3600000;
 
-    const nifty = buildRows(niftyResults, "NIFTY 50");
-    const bank  = buildRows(bankResults, "NIFTY BANK");
+    const nifty = buildRows(niftyResults, "NIFTY 50", 10);
+    const bank  = buildRows(bankResults, "NIFTY BANK", 6);
 
     const html = `
 <!DOCTYPE html>
@@ -151,126 +130,64 @@ app.get('/api/quotes', async (req, res) => {
   <script>
     setTimeout(() => location.reload(), ${refreshRate});
     let sortState = {};
-
     function setHeaderArrow(th, dir) {
-      const arrowSpan = th.querySelector('.sort-arrow');
-      if (!arrowSpan) return;
-      arrowSpan.innerHTML = dir === 'asc'
-        ? '<span class="hdr-arrow up"></span>'
-        : '<span class="hdr-arrow down"></span>';
+      const arrowSpan = th.querySelector('.sort-arrow'); if (!arrowSpan) return;
+      arrowSpan.innerHTML = dir === 'asc' ? '<span class="hdr-arrow up"></span>' : '<span class="hdr-arrow down"></span>';
     }
-    function clearHeaderArrows(table) {
-      table.tHead.querySelectorAll('.sort-arrow').forEach(s => s.innerHTML = '');
-    }
-
-    // Sort only tbody rows; thead (including index row) stays sticky
+    function clearHeaderArrows(table) { table.tHead.querySelectorAll('.sort-arrow').forEach(s => s.innerHTML = ''); }
     function sortTable(tableId, colIndex, numeric=false, key=null, setDefault=false) {
       const table = document.getElementById(tableId);
-      const headers = table.tHead.rows[0].cells; // header titles row
+      const headers = table.tHead.rows[0].cells;
       const tbody = table.tBodies[0];
       const rows = Array.from(tbody.rows);
-
-      let dir;
-      if (setDefault) {
-        dir = 'asc';
-      } else {
-        dir = sortState[tableId+key] === 'asc' ? 'desc' : 'asc';
-      }
+      let dir = setDefault ? 'asc' : (sortState[tableId+key] === 'asc' ? 'desc' : 'asc');
       sortState[tableId+key] = dir;
-
       rows.sort((a, b) => {
-        let ax = a.cells[colIndex].innerText.trim();
-        let bx = b.cells[colIndex].innerText.trim();
-        let x = ax, y = bx;
-        if (numeric) {
-          x = parseFloat(ax.replace('%','').replace(/,/g,''));
-          y = parseFloat(bx.replace('%','').replace(/,/g,''));
-          if (isNaN(x)) x = -Infinity;
-          if (isNaN(y)) y = -Infinity;
-        } else {
-          x = ax.toLowerCase();
-          y = bx.toLowerCase();
-        }
+        let ax = a.cells[colIndex].innerText.trim(), bx = b.cells[colIndex].innerText.trim(), x = ax, y = bx;
+        if (numeric) { x = parseFloat(ax.replace('%','').replace(/,/g,'')); y = parseFloat(bx.replace('%','').replace(/,/g,'')); if (isNaN(x)) x = -Infinity; if (isNaN(y)) y = -Infinity; }
+        else { x = ax.toLowerCase(); y = bx.toLowerCase(); }
         if (x < y) return dir === 'asc' ? -1 : 1;
         if (x > y) return dir === 'asc' ? 1 : -1;
         return 0;
       });
-
-      const frag = document.createDocumentFragment();
-      rows.forEach(r => frag.appendChild(r));
-      tbody.innerHTML = '';
-      tbody.appendChild(frag);
-
-      clearHeaderArrows(table);
-      setHeaderArrow(headers[colIndex], dir);
+      const frag = document.createDocumentFragment(); rows.forEach(r => frag.appendChild(r));
+      tbody.innerHTML = ''; tbody.appendChild(frag);
+      clearHeaderArrows(table); setHeaderArrow(headers[colIndex], dir);
     }
-
     function showTab(tabId) {
       document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
       document.getElementById(tabId).style.display = 'block';
       document.querySelectorAll('.tablinks').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId+'Btn').classList.add('active');
     }
-
     window.onload = () => {
       showTab('niftyTab');
-      // Alphabetical default preserved via server-side build; no auto sort here.
       const niftyHeaders = document.getElementById('niftyTable').tHead.rows[0].cells;
       const bankHeaders  = document.getElementById('bankTable').tHead.rows[0].cells;
-      for (let i = 0; i < niftyHeaders.length; i++) {
-        setHeaderArrow(niftyHeaders[i], 'asc');
-        setHeaderArrow(bankHeaders[i], 'asc');
-      }
+      for (let i = 0; i < niftyHeaders.length; i++) { setHeaderArrow(niftyHeaders[i], 'asc'); setHeaderArrow(bankHeaders[i], 'asc'); }
     };
   </script>
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
-
-    /* Tabs */
     .tab { overflow: hidden; border-bottom: 1px solid #ccc; background-color: #f7f7f7; position: sticky; top: 0; z-index: 5; }
     .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; transition: 0.3s; font-size: 16px; }
     .tab button:hover { background-color: #e9e9e9; }
     .tab button.active { background-color: #ddd; }
     .tabcontent { display: none; padding: 10px; }
-
-    /* Table */
     table { border-collapse: collapse; width: 100%; font-size: 14px; background: #fff; }
     th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
     td:first-child, th:first-child { text-align: left; }
-
-    /* Sticky header titles row */
-    thead tr.header-row th {
-      position: sticky;
-      top: 40px; /* below tabs */
-      z-index: 7;
-      background-color: #f4f4f4;
-      cursor: pointer;
-    }
-
-    /* Sticky index row just below header */
-    thead tr.index-row th {
-      position: sticky;
-      top: 70px; /* adjust if header row height changes */
-      z-index: 6;
-      background-color: #fff9c4;
-      font-weight: bold;
-    }
-
-    /* Alternating body rows */
+    thead tr.header-row th { position: sticky; top: 42px; z-index: 7; background-color: #f4f4f4; cursor: pointer; }
+    thead tr.index-row th { position: sticky; top: 74px; z-index: 6; background-color: #fff9c4; font-weight: bold; }
     tbody tr:nth-child(even) { background-color: #f9f9f9; }
-
-    /* Gain/loss colors */
     .positive { color: green; font-weight: bold; }
     .negative { color: red; font-weight: bold; }
-
-    /* Body cell arrows */
     .arrow { margin-left: 6px; font-weight: bold; }
-
-    /* Header sort arrows (triangles) */
     .sort-arrow { display: inline-block; margin-left: 6px; vertical-align: middle; }
     .hdr-arrow { display: inline-block; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; }
-    .hdr-arrow.up { border-bottom: 8px solid #333; }  /* black */
-    .hdr-arrow.down { border-top: 8px solid #999; }   /* light grey */
+    .hdr-arrow.up { border-bottom: 8px solid #333; }
+    .hdr-arrow.down { border-top: 8px solid #999; }
+    .note-row { text-align: center; font-size: 12px; color: #006699; background: #eef7ff; }
   </style>
 </head>
 <body>
@@ -327,7 +244,6 @@ app.get('/api/quotes', async (req, res) => {
 </body>
 </html>
 `;
-
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   } catch (err) {
@@ -336,5 +252,5 @@ app.get('/api/quotes', async (req, res) => {
 });
 
 /* ========= Server ========= */
-const PORT = process.env.PORT || 10000; // Render provides PORT; fallback to 10000
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Proxy running on http://localhost:${PORT}`));
